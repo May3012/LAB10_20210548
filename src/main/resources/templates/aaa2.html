@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+
+  <title>El Juego de la Memoria</title>
+  <style>
+    #image {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    #image img {
+      width: 100px;
+      height: 100px;
+      margin: 5px;
+      position: relative;
+    }
+    .trash-image {
+      position: absolute;
+      top: 0;
+      right: 0;
+      background: #ffffff;
+      color: #4c0000;
+      border: none;
+      cursor: pointer;
+    }
+    #tablero {
+      display: grid;
+      grid-gap: 10px;
+    }
+    .card {
+      width: 100px;
+      height: 100px;
+      background-color: #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+    }
+    .card img {
+      max-width: 100%;
+      max-height: 100%;
+      display: none;
+    }
+    .hidden {
+      background-color: lightblue;
+    }
+    .ver-imagen {
+      background-color: rgba(255, 255, 255, 0.04);
+    }
+    .borders{
+      padding-bottom: 10px;
+      margin-top: 20px;
+      margin-left: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="borders">
+  <div id="contador-images">Imágenes agregadas: 0</div>
+  <br>
+  <button button type="button" class="btn btn-success" id="agregar-images">Agregar imágenes</button>
+  <br>
+  <input type="file" id="imagen-ingresada" accept=".png" multiple style="display: none;">
+  <br>
+  <div id="image"></div>
+  <br>
+  <div id="tablero"></div>
+  <br>
+  <button type="button" class="btn btn-success" id="inicio" style="display: none;">Comenzar Juego</button>
+  <button button type="button" class="btn btn-success" id="aleatorizar" style="display: none;">Aleatorizar</button>
+  <button button type="button" class="btn btn-success" id="help" style="display: none;">Ayuda</button>
+</div>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+  $(document).ready(function () {
+    //variables globales
+    let contador = 0;
+    const max_images = 15;
+    let imagenes_seleccionadas = [];
+    let ayuda = 0;
+
+    $("#agregar-images").on("click", function () {
+      $("#imagen-ingresada").click();
+    });
+
+    $("#imagen-ingresada").on("change", function (event) {
+      const files = event.target.files;
+      const image_conte = $("#image");
+
+      //logica para permitir solo imagenes png
+      for (let i = 0; i < files.length; i++) {
+        if (files[i].type !== "image/png") {
+          alert("Solo se permiten imágenes PNG");
+          continue;
+        }
+        if (contador >= max_images) {
+          alert("No se puede agregar más de 15 imágenes");
+          break;
+        }
+
+        //usamos FileReader para leer las imagenes
+        const lector_blob = new FileReader();
+        lector_blob.onload = function (e) {
+          const detail_image = $('<div style="position: relative;"></div>');
+          const img = $('<img src="' + e.target.result + '">');
+          const boton_borrar = $('<button class="trash-image">x</button>');
+          detail_image.append(img).append(boton_borrar);
+          image_conte.append(detail_image);
+
+          imagenes_seleccionadas.push(e.target.result);
+          contador++;
+          $("#contador-images").text("Imágenes agregadas: " + contador); //se muestra la cantidad
+          validarInicioJuego();
+
+          //logica para borrar imagenes cargadas
+          boton_borrar.on("click", function () {
+            detail_image.remove();
+            imagenes_seleccionadas.splice(imagenes_seleccionadas.indexOf(e.target.result), 1);
+            contador--;
+            $("#contador-images").text("Imágenes agregadas: " + contador);
+            validarInicioJuego();
+          });
+        };
+        lector_blob.readAsDataURL(files[i]);
+      }
+    });
+
+    function validarInicioJuego() {
+      if (contador >= 2) {
+        $("#inicio").show();
+      } else {
+        $("#inicio").hide();
+      }
+    }
+
+    // Inicio de juego
+    $("#inicio").on("click", function () {
+      const juego_tablero = $("#tablero");
+      juego_tablero.empty(); // inicializar
+      const images = [...imagenes_seleccionadas, ...imagenes_seleccionadas]; //images previamente cargadas :c
+      aleatorio_imagenes(images); // funcion para aleatorizar las imagenes una vez se haga clic en el boton de aleatorizar
+      configurar_tablero_condiciones(images); //
+      $("#aleatorizar, #help").show();
+    });
+
+    $("#aleatorizar").on("click", function () {
+      const cards = $(".card.hidden");
+      aleatorio_imagenes(cards);
+      $("#tablero").append(cards);
+    });
+
+    $("#help").on("click", function () {
+      if (ayuda >= 2) {
+        alert("Ayuda?");
+        return;
+      }
+      ayuda++;
+    });
+
+    function configurar_tablero_condiciones(images) {
+      const columnas = Math.ceil(Math.sqrt(images.length));
+      const rows = Math.floor(images.length / columnas);
+      $("#tablero").css("grid-template-columnas", `repeat(${columnas}, 1fr)`);
+      images.forEach(src => {
+        const card = $('<div class="card hidden"><img src="' + src + '"></div>');
+        card.on("click", function () {
+          if (card.hasClass("ver-imagen"))
+            return;
+
+          card.removeClass("hidden").addClass("ver-imagen");
+          card.find("img").show();
+          chequeo(card);
+        });
+        $("#tablero").append(card);
+      });
+    }
+
+    let first_box = null;
+    function chequeo(card) {
+      if (first_box === null) {
+        first_box = card;
+      } else {
+        const primero = first_box.find("img").attr("src");
+        const segundo = card.find("img").attr("src");
+
+        if (primero=== segundo) {
+          // coinciden!
+          first_box = null;
+        } else {
+          // se ocultan cuando no coinciden:
+          setTimeout(function () {
+            first_box.addClass("hidden").removeClass("ver-imagen").find("img").hide();
+            card.addClass("hidden").removeClass("ver-imagen").find("img").hide();
+            first_box = null;
+          }, 1000);
+        }
+      }
+    }
+
+    function aleatorio_imagenes(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+  });
+</script>
+</body>
+</html>
